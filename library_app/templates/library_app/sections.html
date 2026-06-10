@@ -1,0 +1,48 @@
+{% extends 'library_app/base.html' %}
+
+{% block title %}Sections{% endblock %}
+
+{% block content %}
+  <div class="card">
+    <h2>Library Sections</h2>
+    <p class="muted">Kids, Adults, and General Pakistan-style categories.</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Section</th>
+          <th>Audience</th>
+          <th># Books</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sec in sections %}
+          <tr>
+            <td>
+              <strong>{{ sec.name }}</strong>
+            </td>
+            <td>
+              {% if sec.audience == 'KIDS' %}
+                <span class="pill">Kids</span>
+              {% elif sec.audience == 'ADULTS' %}
+                <span class="pill">Adults</span>
+              {% else %}
+                <span class="pill">General</span>
+              {% endif %}
+            </td>
+            <td>{{ sec.books_count }}</td>
+            <td>
+              <a class="btn" style="padding:8px 10px;" href="{% url 'library-books-by-section' sec.slug %}">View Books</a>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="4" class="muted">No sections available.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}
+

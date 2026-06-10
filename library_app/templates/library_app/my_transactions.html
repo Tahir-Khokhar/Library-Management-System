@@ -1,0 +1,58 @@
+{% extends 'library_app/base.html' %}
+
+{% block title %}My Transactions{% endblock %}
+
+{% block content %}
+  <div class="card">
+    <h2>My Borrow Transactions</h2>
+
+    {% if user.is_authenticated %}
+      <table>
+        <thead>
+          <tr>
+            <th>Book</th>
+            <th>Borrowed</th>
+            <th>Due</th>
+            <th>Status</th>
+            <th>Fine</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for tx in transactions %}
+            <tr>
+              <td><strong>{{ tx.book.title }}</strong></td>
+              <td>{{ tx.borrowed_at }}</td>
+              <td>{{ tx.due_at }}</td>
+              <td>
+                {% if tx.is_returned %}
+                  <span class="pill" style="background:#f3f4f6;">Returned</span>
+                {% else %}
+                  <span class="pill" style="background:#dbeafe;color:#1d4ed8;">Borrowed</span>
+                {% endif %}
+              </td>
+              <td>{{ tx.fine_amount }}</td>
+              <td>
+                {% if not tx.is_returned %}
+                  <form method="post" action="{% url 'library-return-borrow' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="borrow_id" value="{{ tx.id }}" />
+                    <button class="btn" style="background:#ef4444;border:none;" type="submit">Return</button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="6" class="muted">No transactions yet.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+    {% else %}
+      <p class="muted">Login to view your transactions.</p>
+    {% endif %}
+  </div>
+{% endblock %}
+

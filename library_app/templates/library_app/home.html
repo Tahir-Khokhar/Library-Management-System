@@ -1,0 +1,35 @@
+{% extends 'library_app/base.html' %}
+
+{% block title %}Library Home{% endblock %}
+
+{% block content %}
+  <div class="card">
+    <h2>Welcome to the Library</h2>
+    <p class="muted">Browse sections and borrow books.</p>
+
+    <div class="row" style="margin-top: 16px;">
+      <div style="min-width: 280px; flex: 1;">
+        <h3>Step 1: Choose a Section</h3>
+        <p class="muted">Kids stories/comics/manga and adults newspaper collections (plus Pakistan-style categories).</p>
+        <a class="btn" href="{% url 'library-sections' %}">View Sections</a>
+      </div>
+
+      <div style="min-width: 280px; flex: 1;">
+        <h3>Step 2: Membership</h3>
+        {% if user.is_authenticated %}
+          {% if has_membership %}
+            <span class="pill">Membership active</span>
+          {% else %}
+            <span class="pill" style="background:#fff7ed;color:#9a3412;">No active membership</span>
+          {% endif %}
+          <div style="margin-top: 10px;">
+            <a class="btn" href="{% url 'library-membership' %}">Manage Membership</a>
+          </div>
+        {% else %}
+          <p class="muted">Login to manage membership.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+{% endblock %}
+

@@ -1,0 +1,42 @@
+{% extends 'library_app/base.html' %}
+
+{% block title %}Membership{% endblock %}
+
+{% block content %}
+  <div class="card">
+    <h2>Membership</h2>
+
+    {% if user.is_authenticated %}
+      {% if has_membership %}
+        <p class="pill" style="background:#ecfdf5;color:#065f46;">Active membership exists</p>
+      {% else %}
+        <p class="pill" style="background:#fff7ed;color:#9a3412;">No active membership</p>
+      {% endif %}
+
+      <h3 style="margin-top:16px;">Buy Membership</h3>
+      <div class="row" style="margin-top:10px;">
+        <div style="flex:1; min-width:240px;" class="card">
+          <h4>1 Month</h4>
+          <form method="post" action="{% url 'library-membership' %}">
+            {% csrf_token %}
+            <input type="hidden" name="plan" value="MONTH" />
+            <button class="btn" style="background:#2563eb; border:none;">Subscribe (MONTH)</button>
+          </form>
+        </div>
+
+        <div style="flex:1; min-width:240px;" class="card">
+          <h4>1 Year</h4>
+          <form method="post" action="{% url 'library-membership' %}">
+            {% csrf_token %}
+            <input type="hidden" name="plan" value="YEAR" />
+            <button class="btn" style="background:#1d4ed8; border:none;">Subscribe (YEAR)</button>
+          </form>
+        </div>
+      </div>
+
+    {% else %}
+      <p class="muted">Login to manage membership.</p>
+    {% endif %}
+  </div>
+{% endblock %}
+
