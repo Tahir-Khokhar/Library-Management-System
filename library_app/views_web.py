@@ -3,26 +3,31 @@ from django.db.models import Count
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
+from django.utils import timezone
+
+
 
 from .models import Book, BookSection, BorrowTransaction, Membership, MembershipPlan
 
 
-def _has_active_membership(request) -> bool:
+def _has_active_membership(request: HttpRequest) -> bool:
     if not request.user.is_authenticated:
         return False
+
+    now = timezone.now()
     return Membership.objects.filter(
         user=request.user,
         is_active=True,
-        start_date__lte=MembershipPlan,  # dummy to avoid template mistakes
+        start_date__lte=now,
+        end_date__gte=now,
     ).exists()
 
 
+
+
 def home(request: HttpRequest) -> HttpResponse:
-    has_membership = False
-    if request.user.is_authenticated:
-        # Use the model logic for correctness
-        m = Membership.objects.filter(user=request.user).order_by("-created_at").first()
-        has_membership = bool(m and m.is_currently_valid())
+    has_membership = _has_active_membership(request)
+
 
     return render(request, "library_app/home.html", {"has_membership": has_membership})
 
@@ -36,10 +41,8 @@ def sections(request: HttpRequest) -> HttpResponse:
 def books_by_section(request: HttpRequest, slug: str) -> HttpResponse:
     section = get_object_or_404(BookSection, slug=slug)
 
-    has_membership = False
-    if request.user.is_authenticated:
-        m = Membership.objects.filter(user=request.user).order_by("-created_at").first()
-        has_membership = bool(m and m.is_currently_valid())
+    has_membership = _has_active_membership(request)
+
 
     books_qs = section.books.all().order_by("title")
     books = []
@@ -79,8 +82,8 @@ def membership(request: HttpRequest) -> HttpResponse:
             Membership.create_for_user(request.user, plan_enum)
         return redirect("library-membership")
 
-    m = Membership.objects.filter(user=request.user).order_by("-created_at").first()
-    has_membership = bool(m and m.is_currently_valid())
+    has_membership = _has_active_membership(request)
+
     return render(request, "library_app/membership.html", {"has_membership": has_membership})
 
 
@@ -91,9 +94,9 @@ def borrow(request: HttpRequest) -> HttpResponse:
         book_id = request.POST.get("book_id")
         book = get_object_or_404(Book, id=book_id)
 
-        m = Membership.objects.filter(user=request.user).order_by("-created_at").first()
-        if not (m and m.is_currently_valid()):
+        if not _has_active_membership(request):
             return redirect("library-membership")
+
 
         if book.currently_available_copies <= 0:
             return redirect("library-books-by-section", book_id=book_id)
