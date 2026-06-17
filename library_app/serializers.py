@@ -38,6 +38,8 @@ class MembershipCreateSerializer(serializers.Serializer):
 
 
 class BookSerializer(serializers.ModelSerializer):
+    available_copies = serializers.IntegerField(source="currently_available_copies", read_only=True)
+
     class Meta:
         model = Book
         fields = [
@@ -45,7 +47,9 @@ class BookSerializer(serializers.ModelSerializer):
             "title",
             "author",
             "total_copies",
+            "available_copies",
         ]
+
 
 
 
