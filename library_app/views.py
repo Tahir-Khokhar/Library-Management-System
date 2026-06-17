@@ -1,39 +1,48 @@
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
-from rest_framework.views import APIView
-
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-from .models import Book, BorrowTransaction, Membership, MembershipPlan
+from .models import Book, BorrowTransaction, Membership
+
 from .serializers import (
     BorrowRequestSerializer,
     BorrowTransactionSerializer,
+    BookSerializer,
     MembershipCreateSerializer,
     MembershipSerializer,
 )
 
 
 class IsActiveMembership(permissions.BasePermission):
+    """User must have a currently valid active membership."""
+
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
-        return Membership.objects.filter(user=request.user, is_active=True).filter(
-            start_date__lte=timezone.now(), end_date__gte=timezone.now()
+        now = timezone.now()
+        return Membership.objects.filter(
+            user=request.user,
+            is_active=True,
+            start_date__lte=now,
+            end_date__gte=now,
         ).exists()
 
 
 class MembershipViewSet(viewsets.ViewSet):
-
     permission_classes = [permissions.IsAuthenticated]
 
     def list(self, request):
-        qs = Membership.objects.filter(user=request.user).order_by("-created_at")
-        serializer = MembershipSerializer(qs.first(), context={}) if qs.exists() else None
-        if not qs.exists():
+        membership = (
+            Membership.objects.filter(user=request.user)
+            .order_by("-created_at")
+            .first()
+        )
+
+        if membership is None:
             return Response({"has_membership": False}, status=status.HTTP_200_OK)
 
-        membership = qs.first()
         return Response(
             {
                 "has_membership": membership.is_currently_valid(),
@@ -55,39 +64,23 @@ class BookViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def list(self, request):
-        books = Book.objects.all().order_by("id")
-        # simple inline serializer to avoid extra file
-        data = [
-            {
-                "id": b.id,
-                "title": b.title,
-                "author": b.author,
-                "total_copies": b.total_copies,
-                "available_copies": b.currently_available_copies,
-            }
-            for b in books
-        ]
-        return Response({"books": data}, status=status.HTTP_200_OK)
+        qs = Book.objects.all().order_by("id")
+        serializer = BookSerializer(qs, many=True)
+        return Response({"books": serializer.data}, status=status.HTTP_200_OK)
 
 
 class BorrowViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated, IsActiveMembership]
 
     def create(self, request):
-        req = BorrowRequestSerializer(data=request.data)
-        req.is_valid(raise_exception=True)
+        serializer = BorrowRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
-        book = get_object_or_404(Book, id=req.validated_data["book_id"])
-
+        book = get_object_or_404(Book, id=serializer.validated_data["book_id"])
         if book.currently_available_copies <= 0:
-            return Response(
-                {"detail": "No available copies for this book"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            raise ValidationError({"detail": "No available copies for this book"})
 
-        now = timezone.now()
-        due_at = now + timezone.timedelta(days=30)
-
+        due_at = timezone.now() + timezone.timedelta(days=30)
         tx = BorrowTransaction.objects.create(
             user=request.user,
             book=book,
@@ -97,7 +90,7 @@ class BorrowViewSet(viewsets.ViewSet):
 
     def retrieve(self, request, pk=None):
         tx = get_object_or_404(BorrowTransaction, pk=pk, user=request.user)
-        return Response(BorrowTransactionSerializer(tx).data)
+        return Response(BorrowTransactionSerializer(tx).data, status=status.HTTP_200_OK)
 
 
 class ReturnBorrowViewSet(viewsets.ViewSet):
@@ -105,9 +98,12 @@ class ReturnBorrowViewSet(viewsets.ViewSet):
 
     def create(self, request):
         tx_id = request.data.get("borrow_id")
+        if tx_id is None:
+            raise ValidationError({"borrow_id": "This field is required."})
+
         tx = get_object_or_404(BorrowTransaction, pk=tx_id, user=request.user)
         if tx.is_returned:
-            return Response({"detail": "Already returned"}, status=status.HTTP_400_BAD_REQUEST)
+            raise ValidationError({"detail": "Already returned"})
 
         tx.return_book()
         return Response(BorrowTransactionSerializer(tx).data, status=status.HTTP_200_OK)
@@ -118,5 +114,7 @@ class MyTransactionsViewSet(viewsets.ViewSet):
 
     def list(self, request):
         txs = BorrowTransaction.objects.filter(user=request.user).order_by("-borrowed_at")
-        return Response(BorrowTransactionSerializer(txs, many=True).data)
+        serializer = BorrowTransactionSerializer(txs, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 
